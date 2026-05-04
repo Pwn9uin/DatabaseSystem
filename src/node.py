@@ -534,3 +534,190 @@ class BPlusTree:
             node = node.next
 
         return results
+
+class BStarTree(BTree):
+    def __init__(self, order):
+        super().__init__(order)
+
+
+    def check_split(self, node):
+        if len(node.keys) <= 2*self.order: return
+        if node == self.root:
+            super().check_split(node)
+            return
+
+        parent = node.parent
+
+        idx = parent.child.index(node)
+
+        if idx > 0:
+            left = parent.child[idx-1]
+        else:
+            left = None
+
+        if idx < len(parent.child)-1 :
+            right = parent.child[idx+1]
+        else:
+            right = None
+
+        if left is not None and len(left.keys) < 2*self.order:
+            ex_key = parent.keys[idx-1]
+            ex_rid = parent.rids[idx-1]
+
+            left.keys.append(ex_key)
+            left.rids.append(ex_rid)
+
+            parent.keys[idx-1] = node.keys.pop(0)
+            parent.rids[idx-1] = node.rids.pop(0)
+
+            if node.child:
+                ex_child = node.child.pop(0)
+                left.child.append(ex_child)
+                ex_child.parent = left
+                
+
+        elif right is not None and len(right.keys) < 2*self.order:
+            ex_key = parent.keys[idx]
+            ex_rid = parent.rids[idx]
+
+            right.keys.insert(0, ex_key)
+            right.rids.insert(0, ex_rid)
+
+            parent.keys[idx] = node.keys.pop()
+            parent.rids[idx] = node.rids.pop()
+
+            if node.child:
+                ex_child = node.child.pop()
+                right.child.insert(0, ex_child)
+                ex_child.parent = right
+
+        else:
+            if left is not None:
+
+                mid_key = parent.keys[idx-1]
+                mid_rid = parent.rids[idx-1]
+
+                all_keys = left.keys + [mid_key] + node.keys
+                all_rids = left.rids + [mid_rid] + node.rids
+                all_child = left.child + node.child
+
+
+                sp1_idx = len(all_keys)//3
+                sp2_idx = 2*(len(all_keys)//3)
+
+                new_left_keys = all_keys[:sp1_idx]
+                new_left_rids = all_rids[:sp1_idx]
+
+                new_mid_keys = all_keys[sp1_idx+1:sp2_idx]
+                new_mid_rids = all_rids[sp1_idx+1:sp2_idx]
+
+                new_right_keys = all_keys[sp2_idx+1:]
+                new_right_rids = all_rids[sp2_idx+1:]
+
+
+                if all_child:
+                    new_left_child = all_child[:sp1_idx+1]
+                    new_mid_child = all_child[sp1_idx+1:sp2_idx+1]
+                    new_right_child = all_child[sp2_idx+1:]
+                else:
+                    new_left_child = []
+                    new_mid_child = []
+                    new_right_child = []
+
+                left.keys = new_left_keys
+                left.rids = new_left_rids
+                left.child = new_left_child
+
+                for child in left.child:
+                    child.parent = left
+
+                mid = Node()
+                mid.keys = new_mid_keys
+                mid.rids = new_mid_rids
+                mid.child = new_mid_child
+                mid.parent = parent
+                mid.is_leaf = node.is_leaf
+
+                for child in mid.child:
+                    child.parent = mid
+
+                node.keys = new_right_keys
+                node.rids = new_right_rids
+                node.child = new_right_child
+
+                for child in node.child:
+                    child.parent = node
+
+                parent.keys[idx-1] = all_keys[sp1_idx]
+                parent.rids[idx-1] = all_rids[sp1_idx]
+                
+                parent.keys.insert(idx, all_keys[sp2_idx])
+                parent.rids.insert(idx, all_rids[sp2_idx])
+
+                parent.child.insert(idx, mid)
+                self.check_split(parent)
+                
+            else:
+                mid_key = parent.keys[idx]
+                mid_rid = parent.rids[idx]
+
+                all_keys = node.keys + [mid_key] + right.keys
+                all_rids = node.rids + [mid_rid] + right.rids
+                all_child = node.child + right.child
+
+
+                sp1_idx = len(all_keys)//3
+                sp2_idx = 2*(len(all_keys)//3)
+
+                new_left_keys = all_keys[:sp1_idx]
+                new_left_rids = all_rids[:sp1_idx]
+
+                new_mid_keys = all_keys[sp1_idx+1:sp2_idx]
+                new_mid_rids = all_rids[sp1_idx+1:sp2_idx]
+
+                new_right_keys = all_keys[sp2_idx+1:]
+                new_right_rids = all_rids[sp2_idx+1:]
+
+
+                if all_child:
+                    new_left_child = all_child[:sp1_idx+1]
+                    new_mid_child = all_child[sp1_idx+1:sp2_idx+1]
+                    new_right_child = all_child[sp2_idx+1:]
+                else:
+                    new_left_child = []
+                    new_mid_child = []
+                    new_right_child = []
+
+                node.keys = new_left_keys
+                node.rids = new_left_rids
+                node.child = new_left_child
+                for child in node.child:
+                    child.parent = node
+
+                mid = Node()
+                mid.keys = new_mid_keys
+                mid.rids = new_mid_rids
+                mid.child = new_mid_child
+                mid.parent = parent
+                mid.is_leaf = node.is_leaf
+
+                for child in mid.child:
+                    child.parent = mid
+
+                right.keys = new_right_keys
+                right.rids = new_right_rids
+                right.child = new_right_child
+
+                for child in right.child:
+                    child.parent = right
+
+                parent.keys[idx] = all_keys[sp1_idx]
+                parent.rids[idx] = all_rids[sp1_idx]
+                
+                parent.keys.insert(idx+1, all_keys[sp2_idx])
+                parent.rids.insert(idx+1, all_rids[sp2_idx])
+
+                parent.child.insert(idx+1, mid)
+                self.check_split(parent)
+                pass
+        
