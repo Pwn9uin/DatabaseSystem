@@ -10,6 +10,9 @@ class BTree:
     def __init__(self, order):
         self.root = Node()
         self.order = order
+        self.split_cnt = 0
+        self.node_cnt = 1
+        self.key_cnt = 0
     
     def insert(self, key, rid):
         leaf = self.find_leaf(key, self.root)
@@ -31,9 +34,11 @@ class BTree:
         leaf.rids.insert(i, rid)
 
         self.check_split(leaf)
+        self.key_cnt += 1
 
     def check_split(self, node):
         if len(node.keys) <= 2*self.order : return
+        self.split_cnt += 1
 
         midle_key = node.keys[self.order]        
         midle_rid = node.rids[self.order]
@@ -50,6 +55,7 @@ class BTree:
         right_node.child = right_child
         right_node.parent = node.parent
         right_node.is_leaf = node.is_leaf
+        self.node_cnt += 1
 
         for child in right_node.child:
             child.parent = right_node
@@ -66,6 +72,7 @@ class BTree:
             new_root.keys = [midle_key]
             new_root.rids = [midle_rid]
             new_root.is_leaf = False
+            self.node_cnt += 1
 
             node.parent = new_root
             right_node.parent = new_root
@@ -275,6 +282,9 @@ class BPlusTree:
     def __init__(self, order):
         self.root = BPlusNode()
         self.order = order
+        self.split_cnt = 0
+        self.node_cnt = 1
+        self.key_cnt = 0
     
     def search(self, key):
         return self._search(key, self.root)
@@ -308,6 +318,7 @@ class BPlusTree:
 
     def leaf_split(self, node):
         if len(node.keys) <= self.order*2: return
+        self.split_cnt += 1
 
         if node.is_leaf : #leaf_node : copy up
             midle_key = node.keys[self.order]
@@ -317,6 +328,7 @@ class BPlusTree:
             right.rids = node.rids[self.order:]
             right.next = node.next
             right.is_leaf = True
+            self.node_cnt += 1
 
             node.keys = node.keys[:self.order]
             node.rids = node.rids[:self.order]
@@ -330,6 +342,7 @@ class BPlusTree:
                 node.parent = new_root
                 right.parent = new_root
                 self.root = new_root
+                self.node_cnt += 1
                 return
 
 
@@ -347,6 +360,7 @@ class BPlusTree:
             right = BPlusNode()
             right.keys = node.keys[self.order+1:]
             right.is_leaf = False
+            self.node_cnt += 1
 
             right.child = node.child[self.order+1:]
             for i in range(len(right.child)):
@@ -363,6 +377,7 @@ class BPlusTree:
                 node.parent = new_root
                 right.parent = new_root
                 self.root = new_root
+                self.node_cnt += 1
                 return
 
             
@@ -392,6 +407,7 @@ class BPlusTree:
         leaf.rids.insert(i, rid)
 
         self.leaf_split(leaf)
+        self.key_cnt += 1
 
 
     def check_underflow(self, node):
@@ -441,6 +457,7 @@ class BPlusTree:
                     left.next = node.next
 
                     parent.child.pop(idx)
+                    node.parent = None
                     parent.keys.pop(idx-1)
                     self.check_underflow(parent)
 
@@ -450,6 +467,7 @@ class BPlusTree:
                     node.next = right.next
 
                     parent.child.pop(idx+1)
+                    right.parent = None
                     parent.keys.pop(idx)
 
                     self.check_underflow(parent)
@@ -491,7 +509,9 @@ class BPlusTree:
                     
                     for child in node.child:
                         child.parent = left
+                    
                     parent.child.pop(idx)
+                    node.parent = None
                     left.child = left.child + node.child
 
 
@@ -505,6 +525,7 @@ class BPlusTree:
                         child.parent = right
 
                     parent.child.pop(idx+1)
+                    right.parent = None
                     right.child = node.child + right.child
 
                 self.check_underflow(parent)
@@ -535,9 +556,14 @@ class BPlusTree:
 
         return results
 
+
+
 class BStarTree(BTree):
     def __init__(self, order):
         super().__init__(order)
+        self.split_cnt = 0
+        self.node_cnt = 1
+        self.key_cnt = 0
 
 
     def check_split(self, node):
@@ -545,6 +571,7 @@ class BStarTree(BTree):
         if node == self.root:
             super().check_split(node)
             return
+
 
         parent = node.parent
 
@@ -592,6 +619,7 @@ class BStarTree(BTree):
                 ex_child.parent = right
 
         else:
+            self.split_cnt += 1
             if left is not None:
 
                 mid_key = parent.keys[idx-1]
@@ -637,6 +665,7 @@ class BStarTree(BTree):
                 mid.child = new_mid_child
                 mid.parent = parent
                 mid.is_leaf = node.is_leaf
+                self.node_cnt += 1
 
                 for child in mid.child:
                     child.parent = mid
@@ -700,6 +729,7 @@ class BStarTree(BTree):
                 mid.child = new_mid_child
                 mid.parent = parent
                 mid.is_leaf = node.is_leaf
+                self.node_cnt += 1
 
                 for child in mid.child:
                     child.parent = mid
