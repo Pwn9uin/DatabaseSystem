@@ -162,6 +162,9 @@ class BTree:
 
             self.check_underflow(s_node)
 
+        self.key_cnt -= 1
+        return 0
+
 
 
     def find_successor(self, node):
@@ -173,9 +176,10 @@ class BTree:
     def check_underflow(self, node):
         if len(node.keys) >= self.order : return
         if node == self.root:
-            if len(node.keys) == 0 :
+            if len(node.keys) == 0 and not node.is_leaf:
                 self.root = node.child[0]
                 self.root.parent = None
+                self.node_cnt -= 1
             return
         
         parent = node.parent
@@ -264,6 +268,7 @@ class BTree:
                 right.child = node.child + right.child
 
             parent.child.pop(idx)
+            self.node_cnt -= 1
         
             self.check_underflow(parent)
 
@@ -413,7 +418,7 @@ class BPlusTree:
     def check_underflow(self, node):
         if len(node.keys) >= self.order: return
         if node == self.root:
-            if len(node.keys) == 0:
+            if len(node.keys) == 0 and not node.is_leaf:
                 self.root = node.child[0]
                 self.root.parent = None
             return
@@ -436,19 +441,19 @@ class BPlusTree:
                 ex_key = left.keys.pop()
                 ex_rid = left.rids.pop()
 
-                parent.keys[idx-1] = ex_key
-
                 node.keys.insert(0, ex_key)
                 node.rids.insert(0, ex_rid)
+
+                parent.keys[idx-1] = ex_key
 
             elif right is not None and len(right.keys) > self.order:
                 ex_key = right.keys.pop(0)
                 ex_rid = right.rids.pop(0)
 
-                parent.keys[idx] = right.keys[0]
-
                 node.keys.append(ex_key)
                 node.rids.append(ex_rid)
+
+                parent.keys[idx] = right.keys[0]
 
             else:
                 if left is not None:
@@ -459,6 +464,7 @@ class BPlusTree:
                     parent.child.pop(idx)
                     node.parent = None
                     parent.keys.pop(idx-1)
+                    self.node_cnt -= 1
                     self.check_underflow(parent)
 
                 elif right is not None:
@@ -469,7 +475,7 @@ class BPlusTree:
                     parent.child.pop(idx+1)
                     right.parent = None
                     parent.keys.pop(idx)
-
+                    self.node_cnt -= 1
                     self.check_underflow(parent)
         else : # internal node
             if left is not None and len(left.keys) > self.order :
@@ -513,20 +519,21 @@ class BPlusTree:
                     parent.child.pop(idx)
                     node.parent = None
                     left.child = left.child + node.child
-
+                    self.node_cnt -= 1
 
                 else:
-                    node_keys = node.keys
-                    
                     parent_key = parent.keys.pop(idx)
-                    right.keys = node_keys + [parent_key] + right.keys
 
-                    for child in node.child:
-                        child.parent = right
+                    node.keys = node.keys + [parent_key] + right.keys
 
-                    parent.child.pop(idx+1)
+                    for child in right.child:
+                        child.parent = node
+
+                    node.child = node.child + right.child
+
+                    parent.child.pop(idx + 1)
                     right.parent = None
-                    right.child = node.child + right.child
+                    self.node_cnt -= 1
 
                 self.check_underflow(parent)
 
@@ -542,6 +549,8 @@ class BPlusTree:
         leaf.rids.pop(idx)
 
         self.check_underflow(leaf)
+        self.key_cnt -= 1
+        return 0
 
     def range_query(self, start, end):
         node = self.find_leaf(start, self.root)
@@ -750,4 +759,3 @@ class BStarTree(BTree):
                 parent.child.insert(idx+1, mid)
                 self.check_split(parent)
                 pass
-        
