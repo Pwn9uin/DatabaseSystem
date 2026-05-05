@@ -6,6 +6,8 @@ import random
 df = pd.read_csv("student.csv")
 storage = df.to_dict('records')
 
+random.seed(10)
+
 def calc_utilization(tree):
     return (tree.key_cnt / (tree.node_cnt*tree.order*2))
 
@@ -154,25 +156,98 @@ r_keys_2000 = random.sample(keys, 2000)
 r_keys_10p = random.sample(keys, 10000)
 r_keys_20p = random.sample(keys, 20000)
 
+
+def node_check(tree, node):
+
+    if isinstance(tree, BPlusTree):
+        if node.is_leaf:
+            if len(node.keys) != len(node.rids):
+                return False
+        else:
+            if len(node.rids) != 0:
+                return False
+    else:
+        if len(node.keys) != len(node.rids):
+            return False
+
+    for i in range(len(node.keys)-1):
+        if node.keys[i] >= node.keys[i+1]:
+            return False # key not sorted
+
+    if node != tree.root:
+        if len(node.keys) < tree.order:
+            return False #underflow error
+ 
+        if len(node.keys) > 2*tree.order:
+            return False # overflow error
+    
+    if not node.is_leaf :
+        if len(node.child) != len(node.keys)+1:
+            return False # child count error
+
+        for child in node.child:
+            if child.parent != node:
+                return False # parent pointer error
+        
+        for child in node.child:
+            if not node_check(tree, child):
+                return False
+
+    return True
+
+def leaf_link_check(tree):
+    node = tree.root
+    while not node.is_leaf:
+        node = node.child[0]
+
+    prev_key = None
+    while node is not None:
+        for key in node.keys:
+            if prev_key is not None and prev_key >= key:
+                return False
+            prev_key = key
+        node = node.next
+    
+    return True
+
+def tree_integrity_check(tree):
+
+    flag = node_check(tree, tree.root)
+
+    if isinstance(tree, BPlusTree):
+        flag = flag and leaf_link_check(tree)
+
+    return flag
+
+
 def delete_exp(tree, keys):
+    flag = True
+
     start = time.perf_counter()
+
     for key in keys:
         tree.delete(key)
     
     end = time.perf_counter()
 
-    return (end - start) * 1000
+    for key in keys:
+        if tree.search(key) != -1:
+            flag = False
+
+    flag = flag and tree_integrity_check(tree)
+
+    return (end - start) * 1000, flag
 
 for delete_keys, mode in [(r_keys_2000, "2000"), (r_keys_10p, "10 percent"), (r_keys_20p, "20 percent")]:
     btree, _, _, _ = get_avg_insert_time(BTree, d, 1)
     bplus, _, _, _ = get_avg_insert_time(BPlusTree, d, 1)
     bstar, _, _, _ = get_avg_insert_time(BStarTree, d, 1)
 
-    btree_delete_time = delete_exp(btree, delete_keys)
-    bplus_delete_time = delete_exp(bplus, delete_keys)
-    bstar_delete_time = delete_exp(bstar, delete_keys)
+    btree_delete_time, btree_integrity = delete_exp(btree, delete_keys)
+    bplus_delete_time, bplus_integrity = delete_exp(bplus, delete_keys)
+    bstar_delete_time, bstar_integrity = delete_exp(bstar, delete_keys)
 
     print(f"\n ---- delete {mode} ----")
-    print(f"Btree delete time : {btree_delete_time:.3f}ms")
-    print(f"B+tree delete time : {bplus_delete_time:.3f}ms")
-    print(f"B*tree delete time : {bstar_delete_time:.3f}ms")
+    print(f"Btree delete time : {btree_delete_time:.3f}ms, integrity test : {btree_integrity}")
+    print(f"B+tree delete time : {bplus_delete_time:.3f}ms, integrity test : {bplus_integrity}")
+    print(f"B*tree delete time : {bstar_delete_time:.3f}ms, integrity test : {bstar_integrity}")
